@@ -16,6 +16,7 @@
 */
 
 using namespace cv;
+using namespace ml;
 using namespace std;
 
 class CHyperTime2D
@@ -61,7 +62,7 @@ class CHyperTime2D
 		uint32_t lastTimeStamp;
 		float minProb,maxProb,residualEntropy,residualInformation;
 		CHyperTime2D *temporalModel;
-		EM* modelPositive;
+		Ptr<EM> modelPositive;
 		Mat samplesPositive;
 		float corrective;
 		float lastError;

@@ -6,7 +6,6 @@ static bool quick = false;
 CHyperTime2D::CHyperTime2D(const char* name,float spatialCellSize,int temporalCellSize,const char* model,int order)
 {
 	lastError = 1000000000000;
-	modelPositive = NULL;
 	timeDimension = 2;
 	covarianceType = EM::COV_MAT_GENERIC;
 	positives = 0;
@@ -110,10 +109,13 @@ void CHyperTime2D::update(int order)
 	float sumHist = 0;
 	for (int k = 0;k<0;k++)
 	{
-		if (modelPositive != NULL) delete modelPositive; 
-		modelPositive = new EM(order,covarianceType,TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, EM::DEFAULT_MAX_ITERS, FLT_EPSILON));
-		modelPositive->train(samplesPositive);
-		Mat meansPositive = modelPositive->get<Mat>("means");
+		if (!modelPositive.empty()) modelPositive.release();
+		modelPositive = EM::create();
+		modelPositive->setClustersNumber(order);
+		modelPositive->setCovarianceMatrixType(covarianceType);
+		modelPositive->setTermCriteria(TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, EM::DEFAULT_MAX_ITERS, FLT_EPSILON));
+		modelPositive->trainEM(samplesPositive);
+		Mat meansPositive = modelPositive->getMeans();
 		std::cout << meansPositive << std::endl;
 		sumProb = 0;
 		sumHist = 0;
@@ -176,9 +178,12 @@ void CHyperTime2D::update(int order)
 		lastError = sumErr;
 	}
 
-	if (modelPositive != NULL) delete modelPositive; 
-	modelPositive = new EM(order,covarianceType,TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, EM::DEFAULT_MAX_ITERS, FLT_EPSILON));
-	modelPositive->train(samplesPositive);
+	if (!modelPositive.empty()) modelPositive.release();
+	modelPositive = EM::create();
+	modelPositive->setClustersNumber(order);
+	modelPositive->setCovarianceMatrixType(covarianceType);
+	modelPositive->setTermCriteria(TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, EM::DEFAULT_MAX_ITERS, FLT_EPSILON));
+	modelPositive->trainEM(samplesPositive);
 
 	/*calculate relevant corrections*/
 	for (int it = 0;it<tDim;it++){
