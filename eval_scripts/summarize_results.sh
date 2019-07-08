@@ -70,7 +70,8 @@ do
 	echo Model $m param $indmin has $errmin error.  >>best.txt
 done
 create_graph |dot -Tpdf >$d.pdf
-convert -density 200 $d.pdf -trim -bordercolor white $d.png 
+pdftoppm $d.pdf $d -png -r 200
+convert $d-1.png -trim -bordercolor white $d.png
 extend_figure $d.png
 cat best.txt |cut -f 2,4 -d ' '|tr ' ' _|sed s/$/.txt/|sed s/^/..\\/results\\/$d\\//
 f=0
@@ -84,7 +85,8 @@ done
 
 gnuplot draw_summary.gnu >graphs.fig
 fig2dev -Lpdf graphs.fig graphs.pdf
-convert -density 200 graphs.pdf -trim -resize 500x400 graphs.png
+pdftoppm graphs.pdf graphs -png -r 200
+convert graphs-1.png -trim -resize 500x400 graphs.png
 extend_figure graphs.png 
 convert -size 900x450 xc:white \
 	-draw 'Image src-over 25,50 500,400 'graphs.png'' \
