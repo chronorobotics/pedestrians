@@ -79,7 +79,7 @@ n=$((1+$(cat models.tmp|grep -c .)));
 cat draw_summary_skelet.gnu|sed s/XXX/1.0\\/$n/ >draw_summary.gnu
 for i in $(cut -f 1 -d ' ' models.tmp);
 do 
-	echo \'$(grep $i best.txt |cut -f 2,4 -d ' '|tr ' ' _|sed s/$/.txt/|sed s/^/..\\/results\\/$d\\//)\' 'using ($0+XXX):($1*100) with boxes title' \'$i\',\\|sed s/XXX/\($f-$n*0.5+1\)\\/$n\.0/ >>draw_summary.gnu;
+	echo \'$(grep $i best.txt |cut -f 2,4 -d ' '|tr ' ' _|sed s/$/.txt/|sed s/^/..\\/results\\/$d\\//)\' 'using ($0+XXX):($3) with boxes title' \'$i\',\\|sed s/XXX/\($f-$n*0.5+1\)\\/$n\.0/ >>draw_summary.gnu;
 	f=$(($f+1))
 done
 
