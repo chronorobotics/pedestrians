@@ -48,25 +48,25 @@ do
 	indmin=0
 	for o in $(cat models.tmp |grep $m|sed  -e 's/\s\+/\ /g'|cut -f 2-100 -d ' ');
 	do
-	rm ../results/$d/$m\_$o.txt
-	for i in 5 10 
-	do 
-	for j in 5 10 15 30 
-	do
-	a=$(echo $i|awk '{print  $1/100}');
-	b=$(echo $j|awk '{print $1*60}');
-	a=$(grep Error ../results/$d/$(printf "%s_%03i_%04i_%04i.txt\n" $m $o $i $j)|cut -f 4 -d ' ')
-	echo $i $j $a >>../results/$d/$m\_$o.txt
-	done
-	done
-
-	err=$(cat ../results/$d/$m\_$o.txt|awk '{a=a+$3;i=i+1}END{print a/i}')
-	sm=$(echo $err $errmin|awk '{a=0}($1 > $2){a=1}{print a}')
-	if [ $sm == 0 ];
-	then
-	errmin=$err
-	indmin=$o
-	fi
+		rm ../results/$d/$m\_$o.txt
+		for i in 5 10 
+		do 
+			for j in 5 10 15 30 
+			do
+				a=$(echo $i|awk '{print  $1/100}');
+				b=$(echo $j|awk '{print $1*60}');
+				a=$(grep Error ../results/$d/$(printf "%s_%03i_%04i_%04i.txt\n" $m $o $i $j)|cut -f 4 -d ' ')
+				echo $i $j $a >>../results/$d/$m\_$o.txt
+			done
+		done
+		
+		err=$(cat ../results/$d/$m\_$o.txt|awk '{a=a+$3;i=i+1}END{print a/i}')
+		sm=$(echo $err $errmin|awk '{a=0}($1 > $2){a=1}{print a}')
+		if [ $sm == 0 ];
+		then
+			errmin=$err
+			indmin=$o
+		fi
 	done
 	cat ../results/$d/$m\_$indmin.txt|cut -f 3 -d ' ' >$m.txt
 	echo Model $m param $indmin has $errmin error.  >>best.txt
