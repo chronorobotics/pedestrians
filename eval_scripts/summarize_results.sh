@@ -38,7 +38,9 @@ function create_graph
 	echo }
 }
 
-rm best.txt
+if [ -f best.txt ]; then
+	rm best.txt
+fi
 grep -v '#' ../src/models/test_models.txt|tr -d '!' >models.tmp
 for m in $(cut -f 1 -d ' ' models.tmp)
 do
