@@ -161,7 +161,7 @@ void CHyperTime2D::update(int order)
 			fremen.update(5+1);
 			fremen.print(true);
 		if (timeDimension == 0){
-			for (int i = 0;i<5;i++) periods.push_back(fremen.predictFrelements[i].period);
+			for (int i = 0;i<5;i++) periods.push_back(fremen.getPredictFrelements()[i].period);
 		} 
 		int period = periods[timeDimension/2];
 		printf("Error: %.0f, last %.0f adding period %i \n",sumErr,lastError,period);
