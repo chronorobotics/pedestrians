@@ -1,4 +1,6 @@
 #include "CFremenGrid.h"
+#include <string>
+#include <vector>
 
 using namespace std;
 static bool quick = false;
@@ -14,8 +16,6 @@ CFremenGrid::CFremenGrid(const char* name,float spatialCellSize,int temporalCell
 	fscanf(file,"%f %f\n",&minY,&maxY);
 	set(minTime,minX,minY,(int)((maxTime-minTime)/temporalCellSize),(int)((maxX-minX)/spatialCellSize),(int)((maxY-minY)/spatialCellSize),spatialCellSize,temporalCellSize);
 
-	temporalArray = (CTemporal**) calloc(10000000,sizeof(CTemporal));
-
 	/*fill the grid with data*/
 	long int time;
 	float x,y;
@@ -26,8 +26,15 @@ CFremenGrid::CFremenGrid(const char* name,float spatialCellSize,int temporalCell
 		hasData[getFrelementIndex(x,y)]++;
 	}
 	fclose(file);
-	/*spawnModels*/
-	for (int i = 0;i<numFrelements;i++) temporalArray[i] = spawnTemporalModel(model,86400*7,order,1);
+
+	if (std::string(model) == "HyT-CEM") {
+		cem_model = new CExpectation(order, numFrelements);
+	} else {
+		temporalArray = (CTemporal**) calloc(10000000,sizeof(CTemporal));
+
+		/*spawnModels*/
+		for (int i = 0;i<numFrelements;i++) temporalArray[i] = spawnTemporalModel(model,86400*7,order,1);
+	}
 }
 
 CFremenGrid::CFremenGrid(long int originT,float originX,float originY,int dimT,int dimX,int dimY,float spatialCellSize,int temporalCellSize)
@@ -61,7 +68,11 @@ void CFremenGrid::set(long int originT,float originX,float originY,int dimT,int 
 CFremenGrid::~CFremenGrid()
 {
 	free(histogram);
-	for (int i = 0;i<numFrelements;i++) free(temporalArray[i]);
+	if (temporalArray) {
+		for (int i = 0;i<numFrelements;i++) free(temporalArray[i]);
+	} else {
+		delete[] cem_model;
+	}
 }
 
 int CFremenGrid::generateFromData(long int *time, float *x,float *y,int number)
@@ -91,21 +102,50 @@ void CFremenGrid::display(bool verbose)
 
 void CFremenGrid::update(int order)
 {
-	for (int s = 0;s<numFrelements;s++)
-	{
-		if (s == 63 || quick == false){
-			for (int t = 0;t<tDim;t++) temporalArray[s]->add(t*temporalResolution+oT,histogram[t*xDim*yDim+s]);
-			temporalArray[s]->update(order);
+	if (cem_model) {
+		for (int t = 0; t < tDim; ++t) {
+			std::vector<bool> v;
+			for (int s = 0; s < numFrelements; ++s) {
+				v.push_back(histogram[t*xDim*yDim + s]);
+			}
+			cem_model->add_v(t*temporalResolution + oT, v);
+		}
+		cem_model->update(order);
+
+		std::vector<std::vector<float> > predictions;
+		for (int t = 0; t < tDim; ++t) {
+			predictions.push_back(cem_model->estimate_v(t*temporalResolution + oT));
+		}
+
+		for (int s = 0; s < numFrelements; ++s)
+		{
 			float sumProb = 0;
 			float sumHist = 0;
 			int index = 0;
 			for (int t = 0;t<tDim;t++){
 				 index = t*xDim*yDim+s;
-				 sumProb += temporalArray[s]->predict(t*temporalResolution+oT);
+				 sumProb += predictions[t][s];
 				 sumHist += histogram[index];
 			}
-			if (sumProb > 0) temporalArray[s]->correction = sumHist/sumProb;
-			//printf("Corr: %f\n",temporalArray[s]->correction);
+			if (sumProb > 0) cem_model->corrections[s] = sumHist/sumProb;
+		}
+	} else {
+		for (int s = 0;s<numFrelements;s++)
+		{
+			if (s == 63 || quick == false){
+				for (int t = 0;t<tDim;t++) temporalArray[s]->add(t*temporalResolution+oT,histogram[t*xDim*yDim+s]);
+				temporalArray[s]->update(order);
+				float sumProb = 0;
+				float sumHist = 0;
+				int index = 0;
+				for (int t = 0;t<tDim;t++){
+					 index = t*xDim*yDim+s;
+					 sumProb += temporalArray[s]->predict(t*temporalResolution+oT);
+					 sumHist += histogram[index];
+				}
+				if (sumProb > 0) temporalArray[s]->correction = sumHist/sumProb;
+				//printf("Corr: %f\n",temporalArray[s]->correction);
+			}
 		}
 	}
 }
@@ -167,12 +207,21 @@ int CFremenGrid::generateFromModel(int order,CFremenGrid *grid)
 {
 	if (grid == NULL) grid = this;
 	grid->update(order);
-	for (int s = 0;s<numFrelements;s++)
-	{
-		if (s == 63 || quick == false){
-			for (int t = 0;t<tDim;t++) probs[t*xDim*yDim+s] = grid->temporalArray[s]->correction*grid->temporalArray[s]->predict(t*temporalResolution+oT);
+	if (cem_model) {
+		for (int t = 0; t < tDim ; ++t) {
+			std::vector<float> prediction = grid->cem_model->estimate_v(t*temporalResolution + oT);
+			for (int s = 0; s < numFrelements; ++s) {
+				probs[t*xDim*yDim+s] = grid->cem_model->corrections[s] * prediction[s];
+			}
 		}
-		if (s ==63) grid->temporalArray[s]->print();
+	} else {
+		for (int s = 0;s<numFrelements;s++)
+		{
+			if (s == 63 || quick == false){
+				for (int t = 0;t<tDim;t++) probs[t*xDim*yDim+s] = grid->temporalArray[s]->correction*grid->temporalArray[s]->predict(t*temporalResolution+oT);
+			}
+			if (s ==63) grid->temporalArray[s]->print();
+		}
 	}
 	return 0;
 }
@@ -225,7 +274,13 @@ void CFremenGrid::save(const char* filename,bool lossy,int forceOrder)
 	fwrite(&spatialResolution,sizeof(float),1,f);
 	fwrite(&temporalResolution,sizeof(float),1,f);
 	fwrite(probs,sizeof(float),numCells,f);
-	for (int i=0;i<numCells;i++) temporalArray[i]->save(f,false);
+	bool is_cem = cem_model;
+	fwrite(&is_cem,sizeof(bool),1,f);
+	if (is_cem) {
+		cem_model->save(f,false);
+	} else {
+		for (int i=0;i<numCells;i++) temporalArray[i]->save(f,false);
+	}
 	fclose(f);
 }
 
@@ -248,7 +303,14 @@ bool CFremenGrid::load(const char* filename)
 	numCells = xDim*yDim*tDim;
 	numFrelements = xDim*yDim;
 	ret += fread(probs,sizeof(float),numCells,f);
-	for (int i=0;i<numFrelements;i++) temporalArray[i]->load(f);
+	bool is_cem;
+	fread(&is_cem,sizeof(bool),1,f);
+	if (is_cem) {
+		cem_model = new CExpectation(0, 0);
+		cem_model->load(f);
+	} else {
+		for (int i=0;i<numFrelements;i++) temporalArray[i]->load(f);
+	}
 	/*cellArray = (CFrelement**) malloc(numCells*sizeof(CFrelement*));
 	for (int i=0;i<numCells;i++) cellArray[i] = new CFrelement();
 	for (int i=0;i<numCells;i++){

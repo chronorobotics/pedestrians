@@ -8,6 +8,7 @@
 #include "CTimer.h" 
 #include "CTemporal.h"
 #include "CHyperTime2D.h"
+#include "CExpectation.h"
 
 /**
 @author Tom Krajnik
@@ -59,6 +60,7 @@ class CFremenGrid
 		uint32_t lastTimeStamp;
 		float minProb,maxProb,residualEntropy,residualInformation;
 		CTemporal **temporalArray;
+		CExpectation* cem_model;
 };
 
 #endif
