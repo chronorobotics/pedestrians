@@ -68,10 +68,10 @@ void CFremenGrid::set(long int originT,float originX,float originY,int dimT,int 
 CFremenGrid::~CFremenGrid()
 {
 	free(histogram);
-	if (temporalArray) {
-		for (int i = 0;i<numFrelements;i++) free(temporalArray[i]);
-	} else {
+	if (cem_model) {
 		delete cem_model;
+	} else {
+		for (int i = 0;i<numFrelements;i++) free(temporalArray[i]);
 	}
 }
 
