@@ -19,21 +19,33 @@ CFremenGrid::CFremenGrid(const char* name,float spatialCellSize,int temporalCell
 	/*fill the grid with data*/
 	long int time;
 	float x,y;
-	while (feof(file)==0)
-	{
-		fscanf(file,"%ld %f %f\n",&time,&x,&y);
-		histogram[getCellIndex(time,x,y)]++;
-		hasData[getFrelementIndex(x,y)]++;
-	}
-	fclose(file);
 
 	if (std::string(model) == "HyT-CEM") {
 		cem_model = new CExpectation(order);
+		temporalArray = nullptr;
+
+		while (feof(file)==0)
+		{
+			fscanf(file,"%ld %f %f\n",&time,&x,&y);
+			cem_model->add_v(x, y, time);
+			histogram[getCellIndex(time,x,y)]++;
+			hasData[getFrelementIndex(x,y)]++;
+		}
+		fclose(file);
 	} else {
 		temporalArray = (CTemporal**) calloc(10000000,sizeof(CTemporal));
+		cem_model = nullptr;
 
 		/*spawnModels*/
 		for (int i = 0;i<numFrelements;i++) temporalArray[i] = spawnTemporalModel(model,86400*7,order,1);
+
+		while (feof(file)==0)
+		{
+			fscanf(file,"%ld %f %f\n",&time,&x,&y);
+			histogram[getCellIndex(time,x,y)]++;
+			hasData[getFrelementIndex(x,y)]++;
+		}
+		fclose(file);
 	}
 }
 
@@ -103,20 +115,6 @@ void CFremenGrid::display(bool verbose)
 void CFremenGrid::update(int order)
 {
 	if (cem_model) {
-		for (int t = 0; t < tDim; ++t) {
-			std::vector<bool> v;
-			for (int s = 0; s < numFrelements; ++s) {
-				//v.push_back(histogram[t*xDim*yDim + s]);
-				if (histogram[t*xDim*yDim + s]) {
-					int x = s % xDim;
-					int y = s / xDim;
-					for (int i = histogram[t*xDim*yDim + s]; i; --i) {
-						cem_model->add_v(x*spatialResolution + oX, y*spatialResolution + oY, t*temporalResolution + oT);
-					}
-				}
-			}
-			//cem_model->add_v(t*temporalResolution + oT, v);
-		}
 		cem_model->update(order);
 
 		/*std::vector<std::vector<float> > predictions;
@@ -220,7 +218,7 @@ int CFremenGrid::generateFromModel(int order,CFremenGrid *grid)
 			for (int s = 0; s < numFrelements; ++s) {
 				int x = s % xDim;
 				int y = s / xDim;
-				probs[t*xDim*yDim+s] = grid->cem_model->estimate_v(x*spatialResolution + oX, y*spatialResolution + oY, t*temporalResolution + oT);
+				probs[t*xDim*yDim+s] = grid->cem_model->estimate_v(x*spatialResolution + oX, y*spatialResolution + oY, t*temporalResolution + oT) * spatialResolution*spatialResolution*(temporalResolution/86400*2*M_PI);
 			}
 		}
 	} else {
