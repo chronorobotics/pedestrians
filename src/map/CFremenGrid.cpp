@@ -212,13 +212,20 @@ int CFremenGrid::generateFromModel(int order,CFremenGrid *grid)
 {
 	if (grid == NULL) grid = this;
 	grid->update(order);
+	const float size = spatialResolution*spatialResolution*(temporalResolution/86400*2*M_PI);
 	if (cem_model) {
 		for (int t = 0; t < tDim ; ++t) {
 			//std::vector<float> prediction = grid->cem_model->estimate_v(t*temporalResolution + oT);
 			for (int s = 0; s < numFrelements; ++s) {
 				int x = s % xDim;
 				int y = s / xDim;
-				probs[t*xDim*yDim+s] = grid->cem_model->estimate_v(x*spatialResolution + oX, y*spatialResolution + oY, t*temporalResolution + oT) * spatialResolution*spatialResolution*(temporalResolution/86400*2*M_PI);
+				float x1 = x*spatialResolution + oX;
+				float x2 = (x+1)*spatialResolution + oX;
+				float y1 = y*spatialResolution + oY;
+				float y2 = (y+1)*spatialResolution + oY;
+				float t1 = t*temporalResolution + oT;
+				float t2 = (t+1)*temporalResolution + oT;
+				probs[t*xDim*yDim+s] = (grid->cem_model->estimate_v(x1, y1, t1) + grid->cem_model->estimate_v(x2, y1, t1) + grid->cem_model->estimate_v(x1, y2, t1) + grid->cem_model->estimate_v(x2, y2, t1) + grid->cem_model->estimate_v(x1, y1, t2) + grid->cem_model->estimate_v(x2, y1, t2) + grid->cem_model->estimate_v(x1, y2, t2) + grid->cem_model->estimate_v(x2, y2, t2)) * size / 8;
 			}
 		}
 	} else {
