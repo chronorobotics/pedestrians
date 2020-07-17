@@ -49,7 +49,7 @@ do
 	for o in $(cat models.tmp |grep $m|sed  -e 's/\s\+/\ /g'|cut -f 2-100 -d ' ');
 	do
 		rm ../results/$d/$m\_$o.txt
-		for i in 5 10 
+		for i in 20 50 100
 		do 
 			for j in 5 10 15 30 
 			do

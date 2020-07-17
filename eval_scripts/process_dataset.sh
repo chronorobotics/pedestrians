@@ -7,9 +7,9 @@ do
 	do
 		rm ../results/$dataset/$(printf "%s_%02i" $m $o)*
 		echo Model $m, parameter $o
-		for i in 5 10 20 
+		for i in 20 50 100 
 		do 
-			for j in 5 10 15 30 60
+			for j in 5 10 15 30 #60
 			do
 				a=$(echo $i|awk '{print  $1/100}');
 				b=$(echo $j|awk '{print $1*60}');
