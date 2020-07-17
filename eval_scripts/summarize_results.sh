@@ -71,6 +71,7 @@ do
 	cat ../results/$d/$m\_$indmin.txt|cut -f 3 -d ' ' >$m.txt
 	echo Model $m param $indmin has $errmin error.  >>best.txt
 done
+create_graph > graph.dot
 create_graph |dot -Tpdf >$d.pdf
 pdftoppm $d.pdf $d -png -r 200
 convert $d-1.png -trim -bordercolor white $d.png
