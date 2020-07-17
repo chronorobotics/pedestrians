@@ -20,9 +20,14 @@ CFremenGrid::CFremenGrid(const char* name,float spatialCellSize,int temporalCell
 	long int time;
 	float x,y;
 
-	if (std::string(model) == "HyT-CEM") {
+	temporalArray = nullptr;
+	cem_model = nullptr;
+	cemVM_model = nullptr;
+	cemUW_model = nullptr;
+	nn_model = nullptr;
+
+	if (std::string(model) == "HyT-CEM-wC") {
 		cem_model = new CExpectation(order);
-		temporalArray = nullptr;
 
 		while (feof(file)==0)
 		{
@@ -32,9 +37,47 @@ CFremenGrid::CFremenGrid(const char* name,float spatialCellSize,int temporalCell
 			hasData[getFrelementIndex(x,y)]++;
 		}
 		fclose(file);
+	} else if (std::string(model) == "HyT-CEM-vM") {
+			cemVM_model = new CExpectationVM(order);
+
+			while (feof(file)==0)
+			{
+				fscanf(file,"%ld %f %f\n",&time,&x,&y);
+				cemVM_model->add_v(x, y, time);
+				histogram[getCellIndex(time,x,y)]++;
+				hasData[getFrelementIndex(x,y)]++;
+			}
+			fclose(file);
+	} else if (std::string(model) == "LiT-EM") {
+			cemUW_model = new CExpectationUW(order);
+
+			while (feof(file)==0)
+			{
+				fscanf(file,"%ld %f %f\n",&time,&x,&y);
+				cemUW_model->add_v(x, y, time);
+				histogram[getCellIndex(time,x,y)]++;
+				hasData[getFrelementIndex(x,y)]++;
+			}
+			fclose(file);
+	} else if (std::string(model) == "Neural") {
+		nn_model = new CNeural(order, xDim*yDim);
+
+		while (feof(file)==0)
+		{
+			fscanf(file,"%ld %f %f\n",&time,&x,&y);
+			histogram[getCellIndex(time,x,y)]++;
+			hasData[getFrelementIndex(x,y)]++;
+		}
+		fclose(file);
+		for (int t = 0; t < tDim; ++t) {
+			std::vector<double> v;
+			for (int i = 0; i < xDim*yDim; ++i) {
+				v.push_back(histogram[t*xDim*yDim + i]);
+			}
+			nn_model->add_v(t*temporalResolution + oT, v);
+		}
 	} else {
 		temporalArray = (CTemporal**) calloc(10000000,sizeof(CTemporal));
-		cem_model = nullptr;
 
 		/*spawnModels*/
 		for (int i = 0;i<numFrelements;i++) temporalArray[i] = spawnTemporalModel(model,86400*7,order,1);
@@ -82,6 +125,12 @@ CFremenGrid::~CFremenGrid()
 	free(histogram);
 	if (cem_model) {
 		delete cem_model;
+	} else if (cemVM_model) {
+		delete cemVM_model;
+	} else if (cemUW_model) {
+		delete cemUW_model;
+	} else if (nn_model) {
+		delete nn_model;
 	} else {
 		for (int i = 0;i<numFrelements;i++) free(temporalArray[i]);
 	}
@@ -116,24 +165,12 @@ void CFremenGrid::update(int order)
 {
 	if (cem_model) {
 		cem_model->update(order);
-
-		/*std::vector<std::vector<float> > predictions;
-		for (int t = 0; t < tDim; ++t) {
-			predictions.push_back(cem_model->estimate_v(t*temporalResolution + oT));
-		}*/
-
-		/*for (int s = 0; s < numFrelements; ++s)
-		{
-			float sumProb = 0;
-			float sumHist = 0;
-			int index = 0;
-			for (int t = 0;t<tDim;t++){
-				 index = t*xDim*yDim+s;
-				 sumProb += predictions[t][s];
-				 sumHist += histogram[index];
-			}
-			if (sumProb > 0) cem_model->corrections[s] = sumHist/sumProb;
-		}*/
+	} else if (cemVM_model) {
+		cemVM_model->update(order);
+	} else if (cemUW_model) {
+		cemUW_model->update(order);
+	} else if (nn_model) {
+		nn_model->update(order);
 	} else {
 		for (int s = 0;s<numFrelements;s++)
 		{
@@ -228,6 +265,43 @@ int CFremenGrid::generateFromModel(int order,CFremenGrid *grid)
 				probs[t*xDim*yDim+s] = (grid->cem_model->estimate_v(x1, y1, t1) + grid->cem_model->estimate_v(x2, y1, t1) + grid->cem_model->estimate_v(x1, y2, t1) + grid->cem_model->estimate_v(x2, y2, t1) + grid->cem_model->estimate_v(x1, y1, t2) + grid->cem_model->estimate_v(x2, y1, t2) + grid->cem_model->estimate_v(x1, y2, t2) + grid->cem_model->estimate_v(x2, y2, t2)) * size / 8;
 			}
 		}
+	} else if (cemVM_model) {
+			for (int t = 0; t < tDim ; ++t) {
+				//std::vector<float> prediction = grid->cem_model->estimate_v(t*temporalResolution + oT);
+				for (int s = 0; s < numFrelements; ++s) {
+					int x = s % xDim;
+					int y = s / xDim;
+					float x1 = x*spatialResolution + oX;
+					float x2 = (x+1)*spatialResolution + oX;
+					float y1 = y*spatialResolution + oY;
+					float y2 = (y+1)*spatialResolution + oY;
+					float t1 = t*temporalResolution + oT;
+					float t2 = (t+1)*temporalResolution + oT;
+					probs[t*xDim*yDim+s] = (grid->cemVM_model->estimate_v(x1, y1, t1) + grid->cemVM_model->estimate_v(x2, y1, t1) + grid->cemVM_model->estimate_v(x1, y2, t1) + grid->cemVM_model->estimate_v(x2, y2, t1) + grid->cemVM_model->estimate_v(x1, y1, t2) + grid->cemVM_model->estimate_v(x2, y1, t2) + grid->cemVM_model->estimate_v(x1, y2, t2) + grid->cemVM_model->estimate_v(x2, y2, t2)) * size / 8;
+				}
+			}
+	} else if (cemUW_model) {
+			for (int t = 0; t < tDim ; ++t) {
+				//std::vector<float> prediction = grid->cem_model->estimate_v(t*temporalResolution + oT);
+				for (int s = 0; s < numFrelements; ++s) {
+					int x = s % xDim;
+					int y = s / xDim;
+					float x1 = x*spatialResolution + oX;
+					float x2 = (x+1)*spatialResolution + oX;
+					float y1 = y*spatialResolution + oY;
+					float y2 = (y+1)*spatialResolution + oY;
+					float t1 = t*temporalResolution + oT;
+					float t2 = (t+1)*temporalResolution + oT;
+					probs[t*xDim*yDim+s] = (grid->cemUW_model->estimate_v(x1, y1, t1) + grid->cemUW_model->estimate_v(x2, y1, t1) + grid->cemUW_model->estimate_v(x1, y2, t1) + grid->cemUW_model->estimate_v(x2, y2, t1) + grid->cemUW_model->estimate_v(x1, y1, t2) + grid->cemUW_model->estimate_v(x2, y1, t2) + grid->cemUW_model->estimate_v(x1, y2, t2) + grid->cemUW_model->estimate_v(x2, y2, t2)) * size / 8;
+				}
+			}
+	} else if (nn_model) {
+		for (int t = 0; t < tDim ; ++t) {
+			std::vector<float> prediction = grid->nn_model->estimate_v(t*temporalResolution + oT);
+			for (int i = 0; i < xDim*yDim; ++i) {
+				probs[t*xDim*yDim + i] = prediction[i];
+			}
+		}
 	} else {
 		for (int s = 0;s<numFrelements;s++)
 		{
@@ -289,9 +363,20 @@ void CFremenGrid::save(const char* filename,bool lossy,int forceOrder)
 	fwrite(&temporalResolution,sizeof(float),1,f);
 	fwrite(probs,sizeof(float),numCells,f);
 	bool is_cem = cem_model;
+	bool is_cemVM = cemVM_model;
+	bool is_cemUW = cemUW_model;
+	bool is_nn = nn_model;
 	fwrite(&is_cem,sizeof(bool),1,f);
+	fwrite(&is_cemVM,sizeof(bool),1,f);
+	fwrite(&is_nn,sizeof(bool),1,f);
 	if (is_cem) {
 		cem_model->save(f,false);
+	} else if (is_cemVM) {
+		cemVM_model->save(f,false);
+	} else if (is_cemUW) {
+		cemUW_model->save(f,false);
+	} else if (is_nn) {
+		nn_model->save(f,false);
 	} else {
 		for (int i=0;i<numCells;i++) temporalArray[i]->save(f,false);
 	}
@@ -318,10 +403,25 @@ bool CFremenGrid::load(const char* filename)
 	numFrelements = xDim*yDim;
 	ret += fread(probs,sizeof(float),numCells,f);
 	bool is_cem;
+	bool is_cemVM;
+	bool is_cemUW;
+	bool is_nn;
 	fread(&is_cem,sizeof(bool),1,f);
+	fread(&is_cemVM,sizeof(bool),1,f);
+	fread(&is_cemUW,sizeof(bool),1,f);
+	fread(&is_nn,sizeof(bool),1,f);
 	if (is_cem) {
 		cem_model = new CExpectation(0);
 		cem_model->load(f);
+	} else if (is_cemVM) {
+		cemVM_model = new CExpectationVM(0);
+		cemVM_model->load(f);
+	} else if (is_cemUW) {
+		cemUW_model = new CExpectationUW(0);
+		cemUW_model->load(f);
+	} else if (is_nn) {
+		nn_model = new CNeural(0, xDim*yDim);
+		nn_model->load(f);
 	} else {
 		for (int i=0;i<numFrelements;i++) temporalArray[i]->load(f);
 	}

@@ -9,6 +9,9 @@
 #include "CTemporal.h"
 #include "CHyperTime2D.h"
 #include "CExpectation.h"
+#include "CExpectationVM.h"
+#include "CExpectationUW.h"
+#include "CNeural.h"
 
 /**
 @author Tom Krajnik
@@ -61,6 +64,9 @@ class CFremenGrid
 		float minProb,maxProb,residualEntropy,residualInformation;
 		CTemporal **temporalArray;
 		CExpectation* cem_model;
+		CExpectationVM* cemVM_model;
+		CExpectationUW* cemUW_model;
+		CNeural* nn_model;
 };
 
 #endif
