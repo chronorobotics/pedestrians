@@ -60,8 +60,8 @@ do
 			done
 		done
 		
-		err=$(cat ../results/$d/$m\_$o.txt|awk '{a=a+$3;i=i+1}END{print a/i}')
-		sm=$(echo $err $errmin|awk '{a=0}($1 > $2){a=1}{print a}')
+		err=$(cat ../results/$d/$m\_$o.txt|head -1|awk '{a=a+$3;i=i+1}END{print a/i}')
+		sm=$(echo $err $errmin|awk '{a=0}($1 >= $2){a=1}{print a}')
 		if [ $sm == 0 ];
 		then
 			errmin=$err
